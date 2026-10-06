@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Airlock: PCI-safe card and eCheck payments for ElevenLabs Agents</title>
+<meta name="description" content="Keypad digits reach the language model on ElevenLabs Agents today. Airlock routes them through a PCI DSS Level 1 vault so the model and the merchant never see a card. Live demo, measured latency, test evidence, and one proposed platform setting.">
+<meta name="author" content="Daniel Wilson Kemp · Lifted Holdings">
+<meta property="og:title" content="Airlock: PCI-safe card and eCheck payments for ElevenLabs Agents">
+<meta property="og:description" content="A working pattern for taking card and eCheck payments on ElevenLabs Agents without the model or the merchant ever seeing a card.">
+<meta property="og:type" content="article">
+<meta name="theme-color" content="#fcfbf9">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./airlock.css">
+<link rel="stylesheet" href="./viz.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230c0c0d'/%3E%3Cpath d='M10 15v-3a6 6 0 0 1 12 0v3' stroke='%23fff' stroke-width='2.4' fill='none'/%3E%3Crect x='8' y='15' width='16' height='11' rx='2.5' fill='%23fff'/%3E%3C/svg%3E">
+</head>
+<body>
+<a class="skip" href="#demo">Skip to the live demo</a>
+
+<header class="topbar" id="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="./"><span class="brand-mark" aria-hidden="true">A</span>Airlock</a>
+    <nav class="topnav" aria-label="Sections">
+      <a href="#gap" class="hide-sm">The gap</a>
+      <a href="#demo">Demo</a>
+      <a href="#proof" class="hide-sm">Proof</a>
+      <a href="#recommendation" class="hide-sm">Recommendation</a>
+      <a href="https://github.com/LiftedHoldings/airlock" rel="noopener">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<!-- 1. Hero -->
+<article class="wrap hero" aria-labelledby="title">
+  <p class="eyebrow"><span>Engineering</span><span>Payments</span><span>Voice AI</span></p>
+  <h1 id="title">Airlock: PCI-safe card and eCheck payments for ElevenLabs Agents</h1>
+  <p class="sub">Keypad digits reach the language model on ElevenLabs Agents today; Airlock puts a PCI DSS Level 1 vault in that path, so neither the model nor the merchant's servers ever see a card.</p>
+  <p class="meta"><span>October 6, 2026</span><span>Daniel Wilson Kemp</span><span>Lifted Holdings</span><span>12 min read</span></p>
+
+  <section class="listen" aria-label="Narrated summary">
+    <div class="listen-top">
+      <button class="play" id="np-play" type="button" aria-label="Play narrated summary">
+        <svg id="np-icon-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.52.85l12-7.5a1 1 0 0 0 0-1.7l-12-7.5A1 1 0 0 0 7 4.5Z"/></svg>
+        <svg id="np-icon-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" hidden><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+      </button>
+      <div class="listen-meta">
+        <div class="listen-title">Listen to the summary</div>
+        <div class="listen-by">Narrated by Scarlett · ElevenLabs Eleven v4</div>
+      </div>
+      <div class="listen-time" id="np-time" aria-live="off">0:00</div>
+    </div>
+    <input class="progress" id="np-seek" type="range" min="0" max="1" step="0.1" value="0" aria-label="Seek narration">
+    <div class="karaoke" id="np-words" aria-label="Narration transcript"></div>
+    <audio id="np-audio" src="./audio/summary.mp3" preload="metadata"></audio>
+  </section>
+  <p class="ap-link-row"><a href="#demo" id="ap-link">Or watch a live call pay itself →</a></p>
+</article>
+
+<!-- 2. The gap -->
+<section class="wrap block" id="gap" aria-labelledby="gap-h">
+  <p class="kicker"><span class="num">01</span>The gap</p>
+  <h2 id="gap-h">A keypad that types into the model</h2>
+  <div class="prose">
+    <p>In late August 2026, ElevenLabs Agents added caller keypad input. A caller can now press digits during a phone call, which is exactly what a payment needs. The catch is where those digits go: <strong>keypad digits are delivered to the agent's language model as an ordinary user message.</strong> A card number typed on the keypad becomes text in the model's context window.</p>
+    <p>ElevenLabs offers a setting for this, <code>redact_input</code>. Its documentation is precise about what it covers: it replaces keypad entries in stored transcripts, logs and analysis, and it says plainly that it</p>
+  </div>
+  <blockquote class="callout"><p>“does not hide digits from the agent during the live call.”</p><span class="src">ElevenLabs documentation, <code>redact_input</code></span></blockquote>
+  <div class="prose">
+    <p>The obvious workaround is to isolate payment in a dedicated sub-agent and hand the call to it. We tested that against real agents.</p>
+  </div>
+  <div class="finding">
+    <span class="tag">Live finding · 2026-10-06</span>
+    <p>ElevenLabs re-sends the entire conversation, including typed digits, to the Custom LLM on every later turn — even after <code>transfer_to_agent</code> hands the call to another agent. Isolating payment in a sub-agent protects nothing.</p>
+    <p>Digits typed into the web widget's text box are also stored in the ElevenLabs transcript in plain text; <code>redact_input</code> covers keypad entries only.</p>
+  </div>
+  <div class="prose">
+    <p>There is no native secure-capture feature in the ElevenLabs changelog through 2026-09-28. The Stripe integration sends the caller a payment link, which means leaving the conversation to pay. If you want a caller to pay <em>inside</em> the call, the card has to pass through something — and today that something is the model.</p>
+    <p>Airlock changes what the model receives. Every model request from ElevenLabs goes first to a certified vault, which swaps keypad entries for short-lived tokens before anything else sees them. Below is the whole system, running live.</p>
+  </div>
+</section>
+
+<!-- 3 + 4. Live demo + wireframe -->
+<section class="stage" id="demo" aria-labelledby="demo-h">
+  <div class="wide">
+    <div class="stage-intro">
+      <p class="kicker"><span class="num">02</span>Live demo</p>
+      <h2 id="demo-h">Pay a sandbox order. Watch where the card goes.</h2>
+      <p>The call panel is a real ElevenLabs agent, Scarlett at Lifted Coffee Roasters, wired through Airlock exactly as described on this page; it speaks with Eleven v4 Turbo, the low-latency v4 model for live calls. The live data flow is the system as it runs: each packet is labelled with what is actually inside it at that hop, driven by Airlock's own event stream for your call.</p>
+      <p>There are two ways to deploy it. Pick one, start a call, ask to pay an order, then key in a test card. No call handy? Press <b>Replay a real run</b> under the diagram.</p>
+    </div>
+    <div class="mode-switch" role="tablist" aria-label="Deployment mode">
+      <button class="mode-tab" role="tab" type="button" id="mode-desk" data-mode="desk" aria-selected="true" aria-controls="mode-desc"><span class="mt-name">Payment desk</span><span class="mt-tag">Recommended</span><span class="mt-sub">Hosted model · vault on payment turns only</span></button>
+      <button class="mode-tab" role="tab" type="button" id="mode-full" data-mode="full" aria-selected="false" aria-controls="mode-desc"><span class="mt-name">Full conversation</span><span class="mt-tag alt">Custom LLM</span><span class="mt-sub">Merchant's model · vault on every turn</span></button>
+    </div>
+    <div class="mode-desc" id="mode-desc" role="tabpanel" aria-live="polite"></div>
+    <div class="safety" role="note">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3Z"/><path d="M12 10v4.5M12 17.5v.01"/></svg>
+      <div><b>Sandbox only.</b> The vault edge discards any card number that is not a published sandbox test card, and the demo agent is rate-limited. This demo charges NMI and Authorize.net sandboxes; no real money moves.</div>
+    </div>
+
+    <div class="demo-grid">
+      <!-- left: phone panel -->
+      <div class="panel" id="phone" aria-label="Demo call">
+        <div class="panel-h"><span class="dot" id="call-dot"></span><b>Scarlett · Lifted Coffee Roasters</b><span id="call-state" style="margin-left:auto">Idle</span></div>
+        <div class="panel-b">
+          <div class="autopilot" id="autopilot">
+            <div class="ap-row">
+              <button class="btn ap-go" id="ap-go" type="button"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.52.85l12-7.5a1 1 0 0 0 0-1.7l-12-7.5A1 1 0 0 0 7 4.5Z"/></svg>Watch it pay itself</button>
+              <button class="btn danger sm" id="ap-stop" type="button" hidden>Stop</button>
+            </div>
+            <label class="ap-echeck"><input type="checkbox" id="ap-echeck"> Pay by eCheck instead</label>
+            <p class="ap-status" id="ap-status" role="status" aria-live="polite">One click runs a real text-only call — ElevenLabs, the vault, Airlock and the NMI sandbox — with no one at the keyboard. No microphone.</p>
+            <div class="ap-result" id="ap-result" hidden aria-live="polite"></div>
+          </div>
+          <p class="or-manual">Or drive it yourself:</p>
+          <div class="call-ctrls">
+            <button class="btn primary" id="btn-call" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>Start call</button>
+            <button class="btn" id="btn-text" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 5h16v11H8l-4 4V5Z"/></svg>Text only</button>
+            <button class="btn danger" id="btn-end" type="button" disabled>End call</button>
+          </div>
+          <div class="status-line" id="call-status" role="status" aria-live="polite">Mic call or text-only chat. Both go through the same vault.</div>
+
+          <div class="transcript" id="transcript" aria-live="polite" aria-label="Call transcript">
+            <div class="empty">The conversation appears here. Try: “I'd like to pay for order A1042.”</div>
+          </div>
+          <form class="say-row" id="say-form" autocomplete="off">
+            <label class="sr-only" for="say-input">Message to the agent</label>
+            <input id="say-input" type="text" placeholder="Type to the agent…" maxlength="300" disabled>
+            <button class="btn sm" type="submit" id="say-send" disabled>Send</button>
+          </form>
+          <div class="orders" aria-label="Demo orders">
+            <button class="order" type="button" data-order="A1042"><b>A1042</b> $84.20 · espresso + shipping</button>
+            <button class="order" type="button" data-order="A2001"><b>A2001</b> $12.00 · gift card</button>
+            <button class="order" type="button" data-order="A3003"><b>A3003</b> $250.00 · grinder</button>
+            <button class="order" type="button" data-order="A0050"><b>A0050</b> $0.50 · decline test</button>
+          </div>
+
+          <div class="kp-wrap">
+            <div class="kp-display">
+              <span class="kp-digits ph" id="kp-digits" aria-live="polite">Keypad — press # to send</span>
+              <button class="kp-back" id="kp-back" type="button" aria-label="Delete last digit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 5h11v14H9l-6-7 6-7Z"/><path d="m12 9 5 6M17 9l-5 6"/></svg></button>
+            </div>
+            <div class="keypad" id="keypad" role="group" aria-label="Phone keypad">
+              <button class="key" type="button" data-k="1">1<small>&nbsp;</small></button>
+              <button class="key" type="button" data-k="2">2<small>ABC</small></button>
+              <button class="key" type="button" data-k="3">3<small>DEF</small></button>
+              <button class="key" type="button" data-k="4">4<small>GHI</small></button>
+              <button class="key" type="button" data-k="5">5<small>JKL</small></button>
+              <button class="key" type="button" data-k="6">6<small>MNO</small></button>
+              <button class="key" type="button" data-k="7">7<small>PQRS</small></button>
+              <button class="key" type="button" data-k="8">8<small>TUV</small></button>
+              <button class="key" type="button" data-k="9">9<small>WXYZ</small></button>
+              <button class="key" type="button" data-k="*">*<small>&nbsp;</small></button>
+              <button class="key" type="button" data-k="0">0<small>+</small></button>
+              <button class="key hash" type="button" data-k="#" aria-label="Pound — send digits">#<small>SEND</small></button>
+            </div>
+            <p class="kp-note">A browser has no real DTMF, so this keypad collects your digits and sends them as one message when you press # — the same text a phone keypad produces in the model request.</p>
+          </div>
+
+          <div class="kp-wrap">
+            <div class="inst-tabs" role="tablist" aria-label="Test payment methods">
+              <button class="inst-tab" role="tab" type="button" data-inst="visa" aria-selected="true">Visa</button>
+              <button class="inst-tab" role="tab" type="button" data-inst="mastercard" aria-selected="false">Mastercard</button>
+              <button class="inst-tab" role="tab" type="button" data-inst="amex" aria-selected="false">Amex</button>
+              <button class="inst-tab" role="tab" type="button" data-inst="echeck" aria-selected="false">eCheck</button>
+            </div>
+            <div class="inst-stage" id="inst-stage" role="tabpanel">
+              <div id="card-root"></div>
+              <p class="flip-hint" id="flip-hint">Click or press Enter on the card to flip it</p>
+              <div id="check-root" hidden></div>
+              <div class="inst-info" id="inst-info"></div>
+              <div class="typeit" id="typeit"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- right: live data-flow -->
+      <div class="panel viz" id="wireframe" aria-labelledby="wf-h">
+        <div class="panel-h wf-h">
+          <b id="wf-h">Live data flow</b>
+          <span class="live-pill" id="live-pill"><i></i><span id="live-pill-t">Idle</span></span>
+          <span class="wf-src" id="wf-src">replay a real run, or start a call</span>
+        </div>
+        <div class="viz-stage">
+          <svg class="wf-svg" id="wf" viewBox="0 0 720 600" role="img" aria-label="Data flow: caller to ElevenLabs Agents to the vault inbound proxy to Airlock to the vault outbound proxy to NMI or Authorize.net (the payment path). A dashed side node is the agent's language model — the merchant's own, OpenAI-compatible — which Airlock passes normal turns to without card data. Card digits exist only at three PCI DSS Level 1 hops: the ElevenAgents keypad buffer, the vault, and the gateway."></svg>
+          <p class="viz-legend"><i aria-hidden="true"></i>Card digits exist only at the three PCI DSS Level 1 hops marked in amber.</p>
+          <p class="viz-note" id="viz-note"><b>The dashed box is the agent's own brain, relocated.</b> With Custom LLM, ElevenAgents hands the thinking to your endpoint; Airlock passes normal turns to the merchant's model and never sends it card data. Voice, turn-taking and keypad input stay in ElevenAgents.</p>
+          <div class="viz-caption" id="wf-caption" aria-live="polite"><span class="who">ready</span><span>Every packet is labelled with what is actually inside it at that hop.</span></div>
+        </div>
+        <div class="rail-wrap">
+          <ol class="rail" id="steps" aria-label="Payment progress"></ol>
+        </div>
+        <div class="player" id="player">
+          <button class="btn sm primary" id="btn-replay" type="button" aria-label="Play replay"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" id="pl-ico"><path d="M7 4.5v15a1 1 0 0 0 1.52.85l12-7.5a1 1 0 0 0 0-1.7l-12-7.5A1 1 0 0 0 7 4.5Z"/></svg><span id="pl-lbl">Replay a real run</span></button>
+          <label class="sr-only" for="replay-pick">Recorded run</label>
+          <select id="replay-pick"></select>
+          <div class="scrub"><label class="sr-only" for="pl-scrub">Replay position</label><input type="range" id="pl-scrub" min="0" max="0" value="0" step="1"><span id="pl-pos">0 / 0</span></div>
+          <span class="legend" aria-hidden="true"><span><i style="background:var(--blue)"></i>speech</span><span><i style="background:var(--amber)"></i>card data</span><span><i style="background:var(--teal)"></i>token</span><span><i style="background:var(--green)"></i>gateway</span></span>
+        </div>
+        <div class="inspector">
+          <div class="insp-h">
+            <span class="insp-title">Payload inspector</span>
+            <button class="btn sm ghost" id="insp-follow" type="button" aria-pressed="true">Following latest hop</button>
+          </div>
+          <div class="insp-tabs" id="insp-tabs" role="tablist" aria-label="Hops"></div>
+          <div class="insp-body" id="insp-body" role="tabpanel" aria-live="off"><p class="insp-empty">Select a hop, or watch a packet move. You'll see the exact (redacted) payload at that point.</p></div>
+        </div>
+        <details class="logbox">
+          <summary>Airlock event stream <span id="ev-count">0 events</span></summary>
+          <div class="evlog" id="evlog" role="log" aria-label="Airlock event log"><div class="empty">Airlock events appear here — kind, step, brand, last four, timings. Never a card number.</div></div>
+        </details>
+      </div>
+    </div>
+
+    <div class="stage-intro" style="margin-top:34px">
+      <p style="font-size:15px;color:#8b93a0">Tip: NMI's sandbox declines amounts under $1.00, so order A0050 is the decline test. The gateway also refuses an identical card and amount within about 20 minutes (“that payment already went through”) — use a different order or card to retry.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 5. How it works -->
+<section class="wrap block" id="how" aria-labelledby="how-h">
+  <p class="kicker"><span class="num">03</span>How it works</p>
+  <h2 id="how-h">Two proxies, one script, no card in the middle</h2>
+  <div class="prose">
+    <p>An ElevenLabs agent has a language model as its brain. With <strong>Custom LLM</strong>, ElevenAgents hands that thinking to an endpoint you choose, while voice, turn-taking and keypad input stay in ElevenAgents. The model behind it is the merchant's own — any OpenAI-compatible model — not an extra AI added by Airlock. Airlock sets the Custom LLM URL to a vault's <strong>inbound proxy</strong>. The vault inspects the request before it is forwarded, turns keypad entries into tokens, and passes the rest to Airlock, an open-source service that holds only tokens. Airlock either passes the turn to the agent's model — never with card data — or, during a payment, runs a deterministic capture script itself. To charge, Airlock calls the vault's <strong>outbound proxy</strong> with token references; the vault fills in the real values and posts to the gateway.</p>
+    <p>Here is one card payment, step by step.</p>
+  </div>
+  <ol class="seq">
+    <li><b>The caller asks to pay.</b> ElevenLabs posts the conversation to the Custom LLM URL — the vault inbound proxy — with the proxy key in a request header.</li>
+    <li><b>Speech passes through.</b> Nothing card-like is in it, so the vault forwards it to Airlock, which passes it to the agent's model (the merchant's own). When the caller wants to pay, Airlock opens a capture.</li>
+    <li><b>The caller keys the card number and presses #.</b> ElevenLabs delivers the digits as a user message. At the vault, the inbound transform replaces them with a token and a marker such as <code>[[airlock:kp len=16 last4=1111 brand=visa]]</code>. That marker is all Airlock ever receives.</li>
+    <li><b>Airlock runs the script, not the model.</b> While a capture is open, Airlock speaks fixed prompts — expiry, security code, ZIP, save the card?, confirm — and collects one token per field.</li>
+    <li><b>The caller confirms.</b> Airlock sends the outbound proxy a charge whose card fields are token expressions like <code>{{ token }}</code>. Airlock's own key cannot resolve them: detokenization lives on a separate vault application attached only to the fixed-destination outbound proxies. The proxy builds the gateway body itself and posts to NMI or Authorize.net.</li>
+    <li><b>A reduced reply comes back.</b> Status, response code, auth code, AVS and CVV results — no card data. Airlock deletes the tokens; they would expire after 10 minutes anyway.</li>
+    <li><b>The agent tells the caller.</b> The model sees only the outcome, the brand and the last four digits.</li>
+  </ol>
+
+  <h3>Two ways to deploy it</h3>
+  <div class="prose">
+    <p><strong>Payment desk (recommended).</strong> The main agent, Scarlett, runs on ElevenLabs' own hosted language model — no Custom LLM, no merchant model. When the caller is ready to pay, she uses ElevenLabs' native <code>transfer_to_agent</code> to hand the call to a payment-desk agent. The desk agent's Custom LLM goes through the vault to Airlock with the header <code>X-Airlock-Mode: desk</code>. On the desk no language model is called at all: Airlock scripts every word — “You're on the secure payment line. Say ready when you have your card or bank details.”, then the total and the keypad prompts (for an eCheck, the name on the account first) — charges through the vault, says “Thanks for calling. Goodbye.” and ends the call with the <code>end_call</code> system tool.</p>
+    <p><strong>Why the desk ends the call.</strong> ElevenLabs re-sends the entire conversation, typed digits included, to whichever agent speaks next; we proved this live for transfers between Custom-LLM agents. The main agent's hosted model is not behind the vault, so the desk must never hand back to it. It ends the call, or could transfer to a person. <code>transfer_to_agent</code> has no option to drop history today.</p>
+    <p><strong>Full conversation (Custom LLM).</strong> Every turn goes through the vault to Airlock, the merchant's own model handles the conversation, and the conversation continues after the payment. That is the design the step-by-step above walks through.</p>
+  </div>
+  <div class="tbl-wrap">
+    <table class="modes-tbl">
+      <thead><tr><th></th><th>Payment desk <span class="pill ok">recommended</span></th><th>Full conversation (Custom LLM)</th></tr></thead>
+      <tbody>
+        <tr><td>Conversation model</td><td>ElevenLabs-hosted</td><td>The merchant's own</td></tr>
+        <tr><td>Vault in the path</td><td>Payment turns only</td><td>Every turn</td></tr>
+        <tr><td>Extra model</td><td>None</td><td>The merchant's model, behind Airlock</td></tr>
+        <tr><td>After payment</td><td>Call ends, or goes to a person</td><td>Conversation continues</td></tr>
+        <tr><td>Latency added to normal turns</td><td>None</td><td>The vault hop on every turn (~0.65 s median)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Who holds which key</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Holder</th><th>Holds</th><th>Can</th><th>Cannot</th></tr></thead>
+      <tbody>
+        <tr><td>ElevenLabs Agents</td><td>The inbound proxy key, stored as a workspace secret and sent as a request header</td><td>Call the inbound proxy</td><td>Read or create tokens directly</td></tr>
+        <tr><td>Vault inbound transform</td><td><code>token:create</code> only</td><td>Turn keypad entries into tokens</td><td>Read a token back</td></tr>
+        <tr><td>Airlock</td><td><code>token:delete</code> only</td><td>Name tokens in an outbound charge request; delete them after each attempt</td><td>Read a token, or use one with any proxy</td></tr>
+        <tr><td>Detokenizing vault application</td><td><code>token:use</code>, attached only to the fixed-destination outbound proxies</td><td>Resolve token expressions inside the vault, on the way to the gateway</td><td>Be reached any other way</td></tr>
+        <tr><td>Vault outbound proxies</td><td>A fixed gateway destination each</td><td>Build the gateway body and post it</td><td>Send card data anywhere else</td></tr>
+        <tr><td>Gateway (NMI, Authorize.net)</td><td>Its own vault: NMI Customer Vault, Authorize.net customer profiles</td><td>Store saved cards and bank accounts</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="prose">
+    <p>Tokens expire after 10 minutes and are deleted after each attempt. Saved cards and accounts never become long-lived vault tokens: they go to the gateway's own vault, so the only durable copy of a card lives where it would live anyway.</p>
+  </div>
+</section>
+
+<!-- 5b. Why a middleware -->
+<section class="wrap block" id="why" aria-labelledby="why-h">
+  <p class="kicker"><span class="num">04</span>Why a middleware at all?</p>
+  <h2 id="why-h">What a vault transform can't — or shouldn't — do</h2>
+  <div class="prose"><p>A vault transform can rewrite a request. It can't run a payment. Airlock exists for five jobs:</p></div>
+  <ol class="seq">
+    <li><b>State across turns.</b> Which step the caller is on, the token ids, attempt counts and settled orders — the double-charge guard. Vault transforms are stateless.</li>
+    <li><b>The amount comes from the merchant.</b> Never from the model, never from the caller.</li>
+    <li><b>Model routing.</b> Ordinary turns stream through to the model; Airlock intercepts <code>start_payment</code> and runs the capture itself.</li>
+    <li><b>A small card environment.</b> About 200 lines run inside the vault. All business logic lives outside it, on tokens only.</li>
+    <li><b>Observability without card data.</b> The event stream that drives the live diagram above carries step names, brands, last fours and timings — never a card number.</li>
+  </ol>
+  <h3>Option B: vault-only</h3>
+  <div class="prose">
+    <p>The alternative is to point the inbound proxy straight at the model and run the whole capture inside the transform. We didn't choose it. All business logic would become card-environment code; state would have to be rebuilt from the re-sent history on every turn; transforms have a 10–30 second limit; and every conversational turn would be buffered.</p>
+    <p>When ElevenLabs ships native secure capture, jobs 1–4 move into the platform and Airlock disappears.</p>
+  </div>
+</section>
+
+<!-- 6. Proof -->
+<section class="wrap block" id="proof" aria-labelledby="proof-h">
+  <p class="kicker"><span class="num">05</span>Proof</p>
+  <h2 id="proof-h">What has to be true, and how we checked</h2>
+  <div class="stats">
+    <div class="stat"><div class="v">125</div><div class="l">automated tests pass</div></div>
+    <div class="stat"><div class="v">10<small>/10</small></div><div class="l">live vault tests pass on the Basis Theory tenant</div></div>
+    <div class="stat"><div class="v">0</div><div class="l">card-data hits in a leak scan of every log and capture</div></div>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Invariant</th><th>How it was tested</th></tr></thead>
+      <tbody>
+        <tr><td>No card digits arrive at Airlock</td><td>Every recorded step below shows what Airlock actually received; keypad entries arrive only as <code>[[airlock:kp …]]</code> markers. Leak scan: 0 hits.</td></tr>
+        <tr><td>If they did, Airlock refuses them</td><td>A tripwire detector at Airlock; unsigned requests get HTTP 401. Covered by the automated tests.</td></tr>
+        <tr><td>Nothing card-like reaches the model</td><td>240 generated card numbers in 6 formats, including spoken words; the Python and JavaScript detectors are tested for parity.</td></tr>
+        <tr><td>Airlock cannot read or use a token</td><td>Live: <code>GET /tokens/&lt;id&gt;</code> with Airlock's key returns HTTP 403; so does the create-only key. Airlock's key holds <code>token:delete</code> only.</td></tr>
+        <tr><td>Card data leaves the vault only to the gateway</td><td>Live: a token steered into <code>zip</code> or an echo field is refused with HTTP 400; a caller cannot redirect the fixed-destination proxy — the reply still came from NMI; Airlock's key cannot send card data to an arbitrary URL through an ephemeral proxy (HTTP 403).</td></tr>
+        <tr><td>The security code is gone after authorization</td><td>Live: Airlock's key deletes the token (HTTP 204) and a deleted token can no longer be charged (HTTP 400). Tokens also expire after 10 minutes.</td></tr>
+        <tr><td>The capture is deterministic</td><td>Capture state-machine and eCheck tests in the automated suite (125 tests, including 240 generated card numbers in 6 formats); scripted sentences in every recorded run.</td></tr>
+        <tr><td>Every component fails closed</td><td>Unsigned requests: 401. Card data in the wrong field: 400. A deleted token: 400.</td></tr>
+        <tr><td>Logs hold no card data</td><td>Leak scan of every log and capture: 0 hits.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Built-in protections</h3>
+  <div class="prose"><ul>
+    <li><strong>Airlock's key can only delete tokens.</strong> Detokenization lives on a separate vault application attached only to the fixed-destination outbound proxies, so even a key leaked from the Airlock host cannot send card data to another URL (tested: HTTP 403).</li>
+    <li><strong>Card numbers are detected however they are written</strong> — separated by spaces, dashes, commas or slashes, typed in other digit scripts, or spoken as words.</li>
+    <li><strong>A charge always settles.</strong> If the call drops mid-charge, the outcome is still recorded.</li>
+    <li><strong>One order cannot be charged twice in a call.</strong></li>
+    <li><strong>Unclear gateway outcomes are never reported as “no charge”.</strong></li>
+    <li><strong>Confirming a payment requires keypad 1 or a clear yes.</strong></li>
+  </ul></div>
+
+  <h3>Evidence</h3>
+  <div class="prose"><p>Recorded end-to-end runs against the sandboxes. Open a step to see what the caller typed (redacted here), what Airlock actually received, and what the agent said. Open a charge to see the exact request Airlock sent the vault — token expressions only — and the reduced gateway reply.</p></div>
+  <div id="evidence"><p class="prose" style="color:var(--muted)">Loading evidence…</p></div>
+</section>
+
+<!-- 7. Latency -->
+<section class="wrap block" id="latency" aria-labelledby="lat-h">
+  <p class="kicker"><span class="num">06</span>What we measured</p>
+  <h2 id="lat-h">The vault costs about two-thirds of a second</h2>
+  <div class="stats">
+    <div class="stat"><div class="v">648<small>ms</small></div><div class="l">median keypad turn through the vault (13 samples)</div></div>
+    <div class="stat"><div class="v">&lt;20<small>ms</small></div><div class="l">Airlock's own handling</div></div>
+    <div class="stat"><div class="v">4–5<small>s</small></div><div class="l">one charge, end to end</div></div>
+    <div class="stat"><div class="v">~10.8<small>s</small></div><div class="l">added by a cold vault runtime, first request</div></div>
+  </div>
+  <div class="prose">
+    <p>The 648 ms median is the full round trip from our test driver through Basis Theory to Airlock on DigitalOcean and back. Almost all of it is the vault hop.</p>
+    <p><strong>The vault proxy buffers streamed replies.</strong> Time-to-first-byte equalled total time in every sample, so a “one moment” sentence streamed by the model cannot be heard early — the caller would hear it together with the result.</p>
+    <p>So the agent uses ElevenLabs' native soft-timeout fillers instead: “One moment.” at 2.0 seconds, then “Still working on that, thanks for waiting.”, then “Almost there.” They are static text on purpose. The alternative, model-generated fillers, would hand recent conversation context — which may contain keypad turns — to another model.</p>
+    <p><strong>Cold starts are real.</strong> A cold vault runtime added about 10.8 seconds to the first request. Airlock keeps the vault runtimes warm with a ping answered inside the vault, and pre-warms the outbound proxy as soon as the caller reaches the confirm step.</p>
+    <p><strong>Timeouts need room.</strong> ElevenLabs' default <code>cascade_timeout_seconds</code> is 4 seconds (range 2–15). A charge can take longer than that, so the demo agent is set to 15 seconds, and Airlock's capture guard prevents a double charge if ElevenLabs retries the turn.</p>
+  </div>
+  <figure>
+    <div class="fig-card bars" id="echeck-bars" aria-label="eCheck call turn timings"></div>
+    <figcaption id="echeck-cap">Turn times for the eCheck call through the live agent.</figcaption>
+  </figure>
+</section>
+
+<!-- 8. Findings -->
+<section class="wrap block" id="findings" aria-labelledby="find-h">
+  <p class="kicker"><span class="num">07</span>What the tests changed</p>
+  <h2 id="find-h">Seven things we only learned by running it</h2>
+  <ol class="seq">
+    <li><b>Sub-agent isolation doesn't work.</b> The whole history, typed digits included, is re-sent to the Custom LLM on every turn, even after a transfer to another agent.</li>
+    <li><b>NMI's duplicate check ignores the order id.</b> The same card and amount are blocked for about 20 minutes regardless of order. Airlock now tells the caller “that payment already went through” instead of a generic failure.</li>
+    <li><b>Authorize.net replies start with a UTF-8 byte-order mark.</b> The reply has to be read with that in mind before it can be parsed.</li>
+    <li><b>Authorize.net's sandbox rejects eCheck SEC code TEL</b> (error 246; it must be enabled per merchant). The sandbox uses PPD as a stand-in.</li>
+    <li><b>Both gateways require the account-holder name for eChecks.</b> The agent asks for it in conversation before the keypad steps.</li>
+    <li><b>Spoken card numbers are cut at the vault.</b> When a caller reads a card out loud, the number is removed from the sentence and the rest of what they said survives.</li>
+    <li><b>Timestamps looked like cards.</b> Values such as <code>1791292673.7754595</code> tripped an early detector. Dots are no longer treated as separators.</li>
+  </ol>
+</section>
+
+<!-- 9. Cost + PCI -->
+<section class="wrap block" id="cost" aria-labelledby="cost-h">
+  <p class="kicker"><span class="num">08</span>What it costs and what it means for PCI</p>
+  <h2 id="cost-h">Free software, a paid vault, a smaller audit</h2>
+  <div class="prose"><p>Airlock itself is free, Apache-2.0 and self-hosted. The vault is the cost.</p></div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Option</th><th>Price</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td>Basis Theory</td><td>$995/month, includes 20,000 tokens; $0.05/token after</td><td>Test tenants are free. Used for this demo.</td></tr>
+        <tr><td>Evervault</td><td>$995/month + usage</td><td></td></tr>
+        <tr><td>VGS</td><td>From $1,000/month</td><td></td></tr>
+        <tr><td>Twilio Pay Connectors</td><td>From $0.15/transaction</td><td>For comparison: the caller leaves the agent to pay.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="prose"><p>A payment uses about three tokens, so the Basis Theory base plan covers roughly 6,600 payments a month. Spread over volume:</p></div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Payments per month</th><th class="num">Vault cost per payment</th></tr></thead>
+      <tbody>
+        <tr><td>100</td><td class="num">~$10</td></tr>
+        <tr><td>1,000</td><td class="num">~$1</td></tr>
+        <tr><td>6,000</td><td class="num">~$0.17</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <h3>PCI scope</h3>
+  <div class="prose">
+    <p>SAQ A (r1, January 2025) can cover mail- and telephone-order merchants whose account-data handling is fully outsourced to PCI DSS compliant providers. In Airlock's design, card data exists only at ElevenLabs, the vault and the gateway. But Airlock directs the payment flow, so an assessor will likely treat it as security-impacting: expect a reduced set of controls, not zero.</p>
+    <p>Software isn't PCI compliant; deployments are assessed. This is engineering guidance, not legal advice.</p>
+  </div>
+</section>
+
+<!-- 10. Open source -->
+<section class="wrap block" id="oss" aria-labelledby="oss-h">
+  <p class="kicker"><span class="num">09</span>Open source</p>
+  <h2 id="oss-h">Run it yourself</h2>
+  <div class="prose"><p>Airlock is Apache-2.0 at <a href="https://github.com/LiftedHoldings/airlock" rel="noopener">github.com/LiftedHoldings/airlock</a>. The provisioning scripts create the vault keys, transforms and proxies, and the ElevenLabs agent.</p></div>
+<pre class="code"><span class="c"># 1. run Airlock</span>
+docker compose up -d
+
+<span class="c"># 2. create the vault keys, inbound transform and outbound proxies</span>
+python cli/provision_basis_theory.py
+
+<span class="c"># 3. point an ElevenLabs agent at the vault inbound proxy</span>
+python cli/provision_elevenlabs_agent.py</pre>
+  <h3>The eight ElevenAgents settings that matter</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Setting</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Custom LLM URL</td><td>The vault inbound proxy</td></tr>
+        <tr><td>Request header <code>BT-PROXY-KEY</code></td><td>From a workspace secret</td></tr>
+        <tr><td><code>dtmf_input_settings.hash_terminator</code></td><td><code>true</code></td></tr>
+        <tr><td><code>dtmf_input_settings.dtmf_input_timeout</code></td><td><code>5.0</code></td></tr>
+        <tr><td><code>dtmf_input_settings.redact_input</code></td><td><code>true</code></td></tr>
+        <tr><td><code>record_voice</code></td><td><code>false</code></td></tr>
+        <tr><td><code>cascade_timeout_seconds</code></td><td><code>15</code></td></tr>
+        <tr><td>Keypad input</td><td>Enabled</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 11. Recommendation -->
+<section class="wrap block" id="recommendation" aria-labelledby="rec-h">
+  <p class="kicker"><span class="num">10</span>A recommendation for the ElevenLabs product team</p>
+  <h2 id="rec-h">Two changes that would retire the workaround</h2>
+  <div class="prose">
+    <p>Everything above exists to stop one thing: keypad digits becoming a model turn. The platform could do that directly.</p>
+  </div>
+  <h3>1. Secure keypad capture</h3>
+  <div class="prose">
+    <ul>
+      <li>A payment tool <strong>arms</strong> secure capture.</li>
+      <li>While armed, keypad entries are held as secret values and <strong>never become a model turn</strong>. The platform speaks the configured prompts.</li>
+      <li>When the fields are complete, it calls the tool's webhook with the secret values <strong>substituted server-side</strong> — as <code>secret__</code> dynamic variables already are in tool headers.</li>
+      <li>The model receives only approved or declined, the brand and the last four.</li>
+      <li>The values are dropped when the webhook returns, and never reach transcripts, logs or analysis.</li>
+    </ul>
+    <p>The webhook can post straight to NMI or Authorize.net, so the gateway's own vault becomes the only token store. No proxy, no $995 a month, no middleware.</p>
+    <p>Native secure capture also lets the agent keep ElevenLabs' hosted model: no Custom LLM, no vault, no extra model box.</p>
+  </div>
+
+  <figure>
+    <div class="sp" role="img" aria-label="Wireframe of a proposed agent settings panel">
+      <div class="sp-h"><span class="crumbs">Agent · Advanced ·</span> Keypad input</div>
+      <div class="sp-row"><div class="t">Enable DTMF input <span class="pill">exists today</span></div><div class="d">Callers can press keys during the call.</div><div class="ctl"><div class="tog on"></div></div></div>
+      <div class="sp-row"><div class="t">Redact DTMF input <span class="pill">exists today</span></div><div class="d">Replace keypad entries in transcripts, logs and analysis.</div><div class="ctl"><div class="tog on"></div></div></div>
+      <div class="sp-row proposed"><div class="t">Secure keypad capture <span class="pill new">proposed</span></div><div class="d">While a payment tool has it armed, keypad entries are held as secret values and never sent to the model.</div><div class="ctl"><div class="tog on"></div></div></div>
+      <div class="sp-row proposed sub"><div class="t">Send digits to</div><div class="d">The tool whose webhook receives the values, server-side.</div><div class="ctl"><div class="sel">Payment tool</div></div></div>
+      <div class="sp-row proposed sub"><div class="t">Model receives</div><div class="d">What the language model is told after the webhook returns.</div><div class="ctl"><div class="sel">Brand + last four</div></div></div>
+    </div>
+    <figcaption>Wireframe of the proposed setting. The first two rows exist today; the highlighted rows are the proposal.</figcaption>
+  </figure>
+
+<pre class="code" aria-label="Proposed configuration">{
+  <span class="k">"conversation_config"</span>: {
+    <span class="k">"conversation"</span>: {
+      <span class="k">"dtmf_input_settings"</span>: {
+        <span class="k">"dtmf_input_timeout"</span>: 5.0,
+        <span class="k">"hash_terminator"</span>: true,
+        <span class="k">"redact_input"</span>: true,
+        <span class="k">"secure_capture"</span>: {
+          <span class="k">"enabled"</span>: true,
+          <span class="k">"armed_by_tool"</span>: <span class="s">"collect_card_payment"</span>,
+          <span class="k">"fields"</span>: [<span class="s">"card_number"</span>, <span class="s">"expiration"</span>, <span class="s">"security_code"</span>],
+          <span class="k">"model_view"</span>: <span class="s">"brand_and_last_four"</span>
+        }
+      }
+    }
+  }
+}</pre>
+
+  <h3>Why it is small</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>What the feature needs</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Buffer keypad digits until #</td><td><span class="pill ok">exists</span> DTMF input</td></tr>
+        <tr><td>Know a turn came from the keypad</td><td><span class="pill ok">exists</span> DTMF source medium</td></tr>
+        <tr><td>Keep a value away from the model</td><td><span class="pill ok">exists</span> <code>secret__</code> dynamic variables</td></tr>
+        <tr><td>Call an API with stored credentials</td><td><span class="pill ok">exists</span> webhook tools + secrets</td></tr>
+        <tr><td>Redact the entry in history</td><td><span class="pill ok">exists</span> <code>redact_input</code></td></tr>
+        <tr><td>Route buffered digits to a tool instead of the model turn</td><td><span class="pill new">missing</span> this is the feature</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <h3>2. A transfer that leaves keypad turns behind</h3>
+  <div class="prose">
+    <p>Let <code>transfer_to_agent</code> hand off without keypad turns (or with them redacted in the live context). That alone would let a payment desk hand back to the main agent.</p>
+  </div>
+  <p class="closing">Until then, Airlock is the working pattern you can deploy today.</p>
+</section>
+</main>
+
+<footer>
+  <div class="wide">
+    <span>© 2026 Lifted Holdings</span>
+    <span>Apache-2.0</span>
+    <span>Contact <a href="mailto:will@liftedholdings.com">will@liftedholdings.com</a></span>
+    <span><a href="https://github.com/LiftedHoldings/airlock" rel="noopener">github.com/LiftedHoldings/airlock</a></span>
+  </div>
+</footer>
+
+<script src="./vendor/card.js"></script>
+<script type="module" src="./airlock.js"></script>
+</body>
+</html>

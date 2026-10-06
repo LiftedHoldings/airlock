@@ -1,0 +1,8 @@
+Airlock
+Copyright 2026 Daniel Wilson Kemp / Lifted Holdings LLC
+
+This product includes software developed by Lifted Holdings (https://liftedholdings.com).
+
+site/vendor/card.js contains an interactive credit-card visual adapted from
+"Credit Card Payment Form" by quinlo on CodePen (https://codepen.io/quinlo/pen/YONMEa),
+used under the MIT license that applies to public CodePen pens.

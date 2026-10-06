@@ -1,0 +1,5 @@
+-r requirements.txt
+pytest==9.0.3
+ruff==0.15.20
+requests==2.34.2
+websockets==17.1

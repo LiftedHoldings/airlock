@@ -1,0 +1,16 @@
+# Airlock: one container. Secrets come from airlock.env (never committed).
+# --no-access-log: uvicorn's access log is off; Airlock's own allowlisted event log is the only log.
+services:
+  airlock:
+    build: .
+    image: airlock:latest
+    container_name: airlock
+    restart: unless-stopped
+    env_file: airlock.env
+    ports:
+      - "127.0.0.1:8931:8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
