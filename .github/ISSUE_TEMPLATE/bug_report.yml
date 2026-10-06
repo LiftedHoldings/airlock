@@ -1,0 +1,47 @@
+name: Bug report
+description: Something in Airlock behaves differently from the docs.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Security problem?** Do not open an issue. Follow [SECURITY.md](https://github.com/LiftedHoldings/airlock/blob/main/SECURITY.md).
+        **Never paste real card numbers, bank details, keys or secrets.** Use published sandbox test cards only.
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Deployment mode
+      options:
+        - Payment desk
+        - Full Custom LLM
+        - Local emulator / tests
+    validations:
+      required: true
+  - type: dropdown
+    id: gateway
+    attributes:
+      label: Gateway
+      options:
+        - NMI
+        - Authorize.net
+        - Not gateway-related
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+      description: The caller's words or keypad entries (masked), what the agent said, and what the docs say should happen.
+    validations:
+      required: true
+  - type: textarea
+    id: events
+    attributes:
+      label: Event log lines
+      description: The relevant lines from `docker logs airlock` or `AIRLOCK_EVENT_LOG`. They are allowlisted and carry no card data, but check before pasting.
+      render: json
+  - type: input
+    id: version
+    attributes:
+      label: Airlock version or commit
+      placeholder: v0.1.0

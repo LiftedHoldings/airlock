@@ -26,8 +26,15 @@ runs the same transform files as the real vault: see
 [docs/TESTING.md](docs/TESTING.md#end-to-end-driver).
 
 Code style: `ruff check airlock cli tests spike` must pass. Python is formatted with
-`ruff format --line-length 100`. Match the surrounding code; keep functions small and the
-comments about *why*.
+`ruff format` (settings in `ruff.toml`). Match the surrounding code; keep functions small and
+the comments about *why*.
+
+## Where to start
+
+Issues labelled [`good first issue`](https://github.com/LiftedHoldings/airlock/labels/good%20first%20issue)
+can be finished without a vault or gateway account (the unit tests and the local emulator are
+enough). Questions and deployment stories go in
+[Discussions](https://github.com/LiftedHoldings/airlock/discussions).
 
 ## Rules
 

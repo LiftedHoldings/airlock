@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/LiftedHoldings/airlock/blob/main/SECURITY.md
+    about: Please report privately by email, not in a public issue.
+  - name: Questions and ideas
+    url: https://github.com/LiftedHoldings/airlock/discussions
+    about: Ask how to deploy it, or share what you built.
+  - name: Live demo and report
+    url: https://liftedholdings.com/airlock/
+    about: Try a sandbox payment call in the browser.

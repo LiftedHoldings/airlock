@@ -1,7 +1,17 @@
 # Airlock
 
+[![prove](https://github.com/LiftedHoldings/airlock/actions/workflows/prove.yml/badge.svg)](https://github.com/LiftedHoldings/airlock/actions/workflows/prove.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/LiftedHoldings/airlock)](https://github.com/LiftedHoldings/airlock/releases)
+[![Live demo](https://img.shields.io/badge/demo-live-5eead4.svg)](https://liftedholdings.com/airlock/)
+
 **Card and eCheck payments for ElevenLabs Agents, with the card numbers kept away from the
 language model and from the merchant's servers.**
+
+<p align="center">
+  <a href="https://liftedholdings.com/airlock/"><img src="docs/assets/airlock-flow.gif" width="520" alt="A recorded sandbox payment call moving through Airlock: the caller's keypad entries reach the payment desk, become vault tokens, and only the vault's outbound proxy sends card data to the gateway. The main agent is labelled never sees card data."></a>
+  <br><sub>A real sandbox run, replayed: card digits exist only on the amber PCI DSS Level 1 hops.</sub>
+</p>
 
 Airlock puts a PCI DSS Level 1 tokenizing vault (Basis Theory) on the one hop ElevenLabs
 Agents already lets you control: the **Custom LLM** URL. Every request on that hop passes

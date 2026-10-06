@@ -1,0 +1,22 @@
+name: Feature or integration request
+description: A new gateway, vault provider, language, telephony path or caller behaviour.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What you need and why
+      description: The merchant or caller situation this solves.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: PCI scope
+      description: Does this change where card or bank data travels? Which component would see it? (It is fine to say "not sure".)
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Contributing
+      options:
+        - label: I would like to work on this myself.
