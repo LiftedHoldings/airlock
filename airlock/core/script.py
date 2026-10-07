@@ -131,9 +131,14 @@ def _money(amount: str) -> str:
     dollars, _, cents = amount.partition(".")
     cents = (cents + "00")[:2]
     d = int(dollars or 0)
-    if cents == "00":
-        return f"{d} dollars"
-    return f"{d} dollars and {int(cents)} cents"
+    c = int(cents)
+    dollar_word = "dollar" if d == 1 else "dollars"
+    cent_word = "cent" if c == 1 else "cents"
+    if c == 0:
+        return f"{d} {dollar_word}"
+    if d == 0:
+        return f"{c} {cent_word}"
+    return f"{d} {dollar_word} and {c} {cent_word}"
 
 
 def _brand_name(b: str) -> str:
