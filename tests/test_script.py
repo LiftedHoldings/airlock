@@ -207,3 +207,22 @@ def test_deterministic_replay():
         c = cap()
         outs.append([script.handle(c, t).say for t in turns])
     assert outs[0] == outs[1]
+
+
+import pytest
+from airlock.core.script import _money
+
+
+@pytest.mark.parametrize(
+    ("amount", "spoken"),
+    [
+        ("1.00", "1 dollar"),
+        ("1.01", "1 dollar and 1 cent"),
+        ("0.50", "50 cents"),
+        ("12.01", "12 dollars and 1 cent"),
+        ("12.00", "12 dollars"),
+        ("0.01", "1 cent"),
+    ],
+)
+def test_money_pluralization(amount: str, spoken: str) -> None:
+    assert _money(amount) == spoken
